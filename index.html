@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cinemel</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            background: linear-gradient(135deg, #1a0033, #001a33);
+            margin: 0;
+            padding: 0;
+            color: #fff;
+            overflow-x: hidden;
+        }
+        header {
+            background: linear-gradient(90deg, #ff0080, #00f0ff);
+            text-align: center;
+            padding: 4rem;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.5);
+            position: relative;
+            z-index: 10;
+        }
+        header h1 {
+            margin: 0;
+            font-size: 5rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 5px;
+            background: linear-gradient(45deg, #ffd700, #ff0080);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            text-shadow: 0 0 20px #00f0ff, 0 0 30px #ff0080;
+            animation: neonGlow 1.5s ease-in-out infinite alternate;
+        }
+        @keyframes neonGlow {
+            0% { text-shadow: 0 0 10px #00f0ff, 0 0 20px #ff0080; }
+            100% { text-shadow: 0 0 20px #ffd700, 0 0 30px #8b00ff; }
+        }
+        .container {
+            max-width: 1400px;
+            margin: 4rem auto;
+            padding: 0 2rem;
+        }
+        .physics-section {
+            text-align: center;
+            margin-bottom: 4rem;
+        }
+        .physics-section canvas {
+            border: 3px solid #ff0080;
+            border-radius: 15px;
+            box-shadow: 0 0 20px #00f0ff;
+            max-width: 100%;
+        }
+        .ai-section {
+            text-align: center;
+            margin-bottom: 4rem;
+        }
+        .ai-section input {
+            padding: 1rem;
+            font-size: 1.2rem;
+            width: 70%;
+            max-width: 500px;
+            border: 2px solid #ffd700;
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+            font-family: 'Courier New', monospace;
+        }
+        .ai-section button {
+            padding: 1rem 2rem;
+            font-size: 1.2rem;
+            margin-left: 1rem;
+            background: linear-gradient(45deg, #ff0080, #00f0ff);
+            border: none;
+            border-radius: 10px;
+            color: #fff;
+            cursor: pointer;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .ai-section button:hover {
+            transform: scale(1.1);
+            box-shadow: 0 0 15px #ffd700;
+        }
+        #ai-response {
+            margin-top: 2rem;
+            font-size: 1.2rem;
+            color: #e0e0e0;
+            text-shadow: 0 0 5px #000;
+            max-width: 800px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        @media (max-width: 600px) {
+            header { padding: 2rem; }
+            header h1 { font-size: 3rem; }
+            .container { padding: 0 1rem; margin: 2rem auto; }
+            .physics-section canvas { width: 100%; height: 300px; }
+            .ai-section input { width: 80%; font-size: 1rem; }
+            .ai-section button { padding: 0.8rem 1.5rem; font-size: 1rem; }
+            #ai-response { font-size: 1rem; padding: 0 1rem; }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Cinemel</h1>
+    </header>
+    <div class="container">
+        <!-- Physics Simulation Section -->
+        <div class="physics-section">
+            <canvas id="physicsCanvas"></canvas>
+        </div>
+        
+        <!-- Gemini API Interaction Section -->
+        <div class="ai-section">
+            <input id="promptInput" type="text" placeholder="Ask Kaustav Ray about Cinemel or physics...">
+            <button onclick="getResponse()">Submit</button>
+            <div id="ai-response"></div>
+        </div>
+    </div>
+
+    <!-- Matter.js for Physics -->
+    <script src="https://cdn.jsdelivr.net/npm/matter-js@0.18.0/build/matter.min.js"></script>
+    <!-- JavaScript for Physics and Gemini API -->
+    <script>
+        // Physics Simulation with Matter.js
+        const canvas = document.getElementById('physicsCanvas');
+        const engine = Matter.Engine.create({
+            positionIterations: 10, // Increase precision
+            velocityIterations: 10,
+            constraintIterations: 10
+        });
+        const world = engine.world;
+
+        // Set canvas size responsively
+        canvas.width = Math.min(window.innerWidth - 40, 800);
+        canvas.height = 400;
+
+        const render = Matter.Render.create({
+            element: document.querySelector('.physics-section'),
+            engine: engine,
+            canvas: canvas,
+            options: {
+                width: canvas.width,
+                height: canvas.height,
+                wireframes: false,
+                background: 'transparent'
+            }
+        });
+
+        // Add boundaries with zero friction
+        const ground = Matter.Bodies.rectangle(canvas.width / 2, canvas.height - 10, canvas.width, 20, {
+            isStatic: true,
+            friction: 0,
+            frictionStatic: 0,
+            slop: 0, // Prevent sticking
+            render: { fillStyle: '#ff0080' }
+        });
+        const leftWall = Matter.Bodies.rectangle(0, canvas.height / 2, 20, canvas.height, {
+            isStatic: true,
+            friction: 0,
+            frictionStatic: 0,
+            slop: 0,
+            render: { fillStyle: '#ff0080' }
+        });
+        const rightWall = Matter.Bodies.rectangle(canvas.width, canvas.height / 2, 20, canvas.height, {
+            isStatic: true,
+            friction: 0,
+            frictionStatic: 0,
+            slop: 0,
+            render: { fillStyle: '#ff0080' }
+        });
+        const topWall = Matter.Bodies.rectangle(canvas.width / 2, 10, canvas.width, 20, {
+            isStatic: true,
+            friction: 0,
+            frictionStatic: 0,
+            slop: 0,
+            render: { fillStyle: '#ff0080' }
+        });
+
+        Matter.World.add(world, [ground, leftWall, rightWall, topWall]);
+
+        // Add bouncing balls with initial velocity and no ball-to-ball collisions
+        const ball1 = Matter.Bodies.circle(canvas.width * 0.25, 50, 30, {
+            restitution: 1.0,
+            friction: 0,
+            frictionAir: 0,
+            frictionStatic: 0,
+            slop: 0,
+            collisionFilter: { group: -1 }, // Negative group prevents ball-to-ball collisions
+            render: { fillStyle: '#00f0ff' }
+        });
+        const ball2 = Matter.Bodies.circle(canvas.width * 0.5, 100, 30, {
+            restitution: 1.0,
+            friction: 0,
+            frictionAir: 0,
+            frictionStatic: 0,
+            slop: 0,
+            collisionFilter: { group: -2 },
+            render: { fillStyle: '#ffd700' }
+        });
+        const ball3 = Matter.Bodies.circle(canvas.width * 0.75, 150, 30, {
+            restitution: 1.0,
+            friction: 0,
+            frictionAir: 0,
+            frictionStatic: 0,
+            slop: 0,
+            collisionFilter: { group: -3 },
+            render: { fillStyle: '#ff0080' }
+        });
+
+        // Set initial downward velocity to ensure immediate bouncing
+        Matter.Body.setVelocity(ball1, { x: 0, y: -5 });
+        Matter.Body.setVelocity(ball2, { x: 0, y: -5 });
+        Matter.Body.setVelocity(ball3, { x: 0, y: -5 });
+
+        Matter.World.add(world, [ball1, ball2, ball3]);
+
+        // Run the engine and renderer
+        Matter.Engine.run(engine);
+        Matter.Render.run(render);
+
+        // Maintain constant energy to prevent energy loss
+        Matter.Events.on(engine, 'beforeUpdate', () => {
+            [ball1, ball2, ball3].forEach(ball => {
+                const speed = Matter.Vector.magnitude(ball.velocity);
+                const minSpeed = 5; // Minimum speed to maintain bouncing
+                if (speed < minSpeed) {
+                    // Normalize velocity to maintain direction, scale to minSpeed
+                    const direction = Matter.Vector.normalise(ball.velocity);
+                    Matter.Body.setVelocity(ball, {
+                        x: direction.x * minSpeed,
+                        y: direction.y * minSpeed
+                    });
+                }
+            });
+        });
+
+        // Handle phone tilt with DeviceOrientation API
+        function handleOrientation(event) {
+            const gamma = event.gamma; // Left-right tilt in degrees (-90 to 90)
+            if (gamma !== null) {
+                const gravityX = gamma / 45; // Map to -1 to 1
+                engine.world.gravity.x = Math.max(-1, Math.min(1, gravityX));
+            }
+        }
+
+        // Request permission for device orientation on iOS
+        if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+            const permissionButton = document.createElement('button');
+            permissionButton.id = 'requestPermissionButton';
+            permissionButton.innerText = 'Enable Tilt';
+            permissionButton.style.position = 'fixed';
+            permissionButton.style.top = '10px';
+            permissionButton.style.right = '10px';
+            permissionButton.style.padding = '10px';
+            permissionButton.style.background = 'linear-gradient(45deg, #ff0080, #00f0ff)';
+            permissionButton.style.border = 'none';
+            permissionButton.style.borderRadius = '5px';
+            permissionButton.style.color = '#fff';
+            permissionButton.style.cursor = 'pointer';
+            document.body.appendChild(permissionButton);
+
+            permissionButton.addEventListener('click', () => {
+                DeviceOrientationEvent.requestPermission()
+                    .then(response => {
+                        if (response === 'granted') {
+                            window.addEventListener('deviceorientation', handleOrientation);
+                            permissionButton.style.display = 'none';
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Permission error:', error);
+                    });
+            });
+        } else {
+            window.addEventListener('deviceorientation', handleOrientation);
+        }
+
+        // Gemini API Integration with Custom AI Definition
+        const apiKey = "AIzaSyDinNjJs4jkTUoYG7B2XQKtrC6ObDc40S0";
+        const endpoint = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent";
+        const aiDefinition = "Your name is Kaustav Ray. You were made by Kaustav Ray. Your server is in Kolkata. ";
+
+        async function getResponse() {
+            const userPrompt = document.getElementById('promptInput').value || "Describe a feature for Cinemel.";
+            const fullPrompt = aiDefinition + userPrompt;
+            const responseDiv = document.getElementById('ai-response');
+            responseDiv.innerHTML = "Loading...";
+            
+            try {
+                const response = await fetch(`${endpoint}?key=${apiKey}`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: fullPrompt }] }],
+                    }),
+                });
+                
+                if (!response.ok) throw new Error("API request failed");
+                const data = await response.json();
+                const text = data.candidates[0].content.parts[0].text;
+                responseDiv.innerHTML = text.replace(/\n/g, '<br>');
+            } catch (error) {
+                responseDiv.innerHTML = "Error: Unable to fetch response. Please try again.";
+                console.error("Error:", error);
+            }
+        }
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            canvas.width = Math.min(window.innerWidth - 40, 800);
+            canvas.height = 400;
+            render.options.width = canvas.width;
+            render.options.height = canvas.height;
+
+            // Update static bodies' positions
+            Matter.Body.setPosition(ground, { x: canvas.width / 2, y: canvas.height - 10 });
+            Matter.Body.setPosition(leftWall, { x: 0, y: canvas.height / 2 });
+            Matter.Body.setPosition(rightWall, { x: canvas.width, y: canvas.height / 2 });
+            Matter.Body.setPosition(topWall, { x: canvas.width / 2, y: 10 });
+
+            // Reposition balls to stay within bounds and reapply initial velocity
+            Matter.Body.setPosition(ball1, { x: canvas.width * 0.25, y: 50 });
+            Matter.Body.setPosition(ball2, { x: canvas.width * 0.5, y: 100 });
+            Matter.Body.setPosition(ball3, { x: canvas.width * 0.75, y: 150 });
+            Matter.Body.setVelocity(ball1, { x: 0, y: -5 });
+            Matter.Body.setVelocity(ball2, { x: 0, y: -5 });
+            Matter.Body.setVelocity(ball3, { x: 0, y: -5 });
+        });
+    </script>
+</body>
+</html>
